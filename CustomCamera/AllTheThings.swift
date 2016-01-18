@@ -5,9 +5,9 @@ import Photos
 /// Manages the session and devices
 class VideoCaptureManager: NSObject {
     /// The camera
-    let captureDevice: AVCaptureDevice
+    let captureDevice: AVCaptureDevice?
     /// The microphone
-    let captureAudioDevice: AVCaptureDevice
+    let captureAudioDevice: AVCaptureDevice?
     /// Where is what we are captureing going? (heres a hint, the session)
     var captureOutput: AVCaptureMovieFileOutput?
     /// Manages the coordination between our two (for now) devices.
@@ -26,16 +26,18 @@ class VideoCaptureManager: NSObject {
         captureDevice = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeVideo)
         captureAudioDevice = AVCaptureDevice.defaultDeviceWithMediaType(AVMediaTypeAudio)
         // TODO: safely try
-        try! captureDevice.lockForConfiguration()
-        captureDevice.focusMode = .ContinuousAutoFocus
-        captureDevice.unlockForConfiguration()
+        try! captureDevice?.lockForConfiguration()
+        captureDevice?.focusMode = .ContinuousAutoFocus
+        captureDevice?.unlockForConfiguration()
         
         // Session
         captureSession = AVCaptureSession()
         captureSession.sessionPreset = AVCaptureSessionPresetHigh
         // TODO: safely try
-        try! captureSession.addInput(AVCaptureDeviceInput(device: captureDevice))
-        try! captureSession.addInput(AVCaptureDeviceInput(device: captureAudioDevice))
+        do {
+            try captureSession.addInput(AVCaptureDeviceInput(device: captureDevice))
+            try captureSession.addInput(AVCaptureDeviceInput(device: captureAudioDevice))
+        } catch {}
         
         super.init()
     }
@@ -46,22 +48,17 @@ class VideoCaptureManager: NSObject {
         let output = AVCaptureMovieFileOutput()
         captureOutput = output
         captureSession.addOutput(output)
-        if let delegate = delegate { delegate.willStartRecording(output, session: captureSession, url: url) }
+        delegate?.willStartRecording(output, session: captureSession, url: url)
         output.startRecordingToOutputFileURL(url, recordingDelegate: self)
-        if let delegate = delegate { delegate.didStartRecording(output, session: captureSession, url: url) }
+        delegate?.didStartRecording(output, session: captureSession, url: url)
     }
     
     /// Stops the current capture output. If no capture output exists, we fail silently.
     /// TODO: maybe not fail silently?
     func stopRecording() {
         guard let captureOutput = captureOutput else { return }
-        let url = captureOutput.outputFileURL
-        
-        if let delegate = delegate {
-            delegate.willStopRecording(captureOutput, session: captureSession, url: url)
-        }
+        delegate?.willStopRecording(captureOutput, session: captureSession, url: captureOutput.outputFileURL)
         captureOutput.stopRecording()
-        
         captureSession.removeOutput(captureOutput)
         self.captureOutput = nil
     }
